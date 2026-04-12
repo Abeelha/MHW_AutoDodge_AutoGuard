@@ -1,10 +1,13 @@
 -- MHW_AutoDodge.lua
 -- Auto Perfect Dodge (Bow) and Auto Perfect Guard (HBG) for Monster Hunter Wilds.
 --
--- BOW:  hooks evHit_Damage PRE + SKIP_ORIGINAL, queues Cat=2 Idx=9 (dodge start).
---       Secondary evHit_DamagePreProcess calls then upgrade to Cat=2 Idx=33 + SUB Cat=1 Idx=1.
+-- Both weapons hook evHit_Damage PRE and return SKIP_ORIGINAL to cancel the hit.
 --
--- HBG:  hooks evHit_Damage + SKIP_ORIGINAL (confirmed working, unchanged).
+-- BOW:  queues Cat=2 Idx=9 (dodge start). The game's secondary evHit_DamagePreProcess
+--       calls from the same attack upgrade the dodge to Cat=2 Idx=33 + SUB Cat=1 Idx=1
+--       (perfect dodge with flash/slow effect) naturally.
+--
+-- HBG:  calls startNoHitTimer + queues Cat=1 Idx=146 (perfect guard).
 
 local CONFIG_PATH = "MHW_AutoDodge.json"
 local BOW         = 11
@@ -132,7 +135,6 @@ local showWindow = false
 re.on_draw_ui(function()
     if imgui.button('Auto Evade / Guard') then
         showWindow = not showWindow
-        saveConfig()
     end
     if not showWindow then return end
 
