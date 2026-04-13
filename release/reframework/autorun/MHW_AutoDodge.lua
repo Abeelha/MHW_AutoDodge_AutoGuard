@@ -1,5 +1,5 @@
 -- MHW_AutoDodge.lua
--- Auto Perfect Dodge (Bow, LBG) and Auto Perfect Guard (HBG, GS) for Monster Hunter Wilds.
+-- Auto Perfect Dodge (Bow, LBG, DB) and Auto Perfect Guard (HBG, GS, SnS) for Monster Hunter Wilds.
 --
 -- All weapons hook evHit_Damage PRE and return SKIP_ORIGINAL to cancel the hit.
 --
@@ -12,21 +12,29 @@
 --
 -- GS:   startNoHitTimer + queues Cat=1 Idx=146 (perfect guard, same action ID as HBG).
 --
--- Mount detection: character:call("get_IsPorterRiding") == true → skip hook entirely.
+-- SnS:  user-selectable — guard (Cat=1 Idx=146) or dodge (Cat=1 Idx=19).
+--
+-- DB:   queues Cat=1 Idx=19 normally (regular dodge, no perfect dodge in normal stance),
+--       or Cat=2 Idx=47 while in demon mode (→ secondary hits upgrade to Cat=2 Idx=48 perfect dodge).
+--
+-- Mount detection: get_IsPorterRiding == true → skip hook entirely.
 
 local CONFIG_PATH = "MHW_AutoDodge.json"
-local GS          = 0
-local BOW         = 11
-local HBG         = 12
-local LBG         = 13
+local SNS = 1
+local DB  = 2
+local GS  = 0
+local BOW = 11
+local HBG = 12
+local LBG = 13
 
 local ACTION_ID_TD = sdk.find_type_definition("ace.ACTION_ID")
 local HUNTER_TD    = sdk.find_type_definition("app.HunterCharacter")
 
-local character     = nil
-local weaponType    = -1
+local character      = nil
+local weaponType     = -1
 local isPorterRiding = false
-local lastHitAt     = 0
+local dbDemonMode    = false
+local lastHitAt      = 0
 
 local function defaultConfig()
     return {
@@ -44,6 +52,13 @@ local function defaultConfig()
         -- GS
         gsEnabled     = true,
         gsCooldown    = 0.3,
+        -- SnS
+        snsEnabled    = true,
+        snsGuard      = true,   -- true = perfect guard, false = dodge
+        snsCooldown   = 0.3,
+        -- DB
+        dbEnabled     = true,
+        dbCooldown    = 0.3,
         -- Misc
         bypassChecks  = true,
     }
@@ -105,10 +120,13 @@ re.on_pre_application_entry('BeginRendering', function()
         weaponType = wok and wt or -1
         local rok, rv = pcall(function() return char:call("get_IsPorterRiding") end)
         isPorterRiding = rok and rv == true
+        -- TODO: replace with real demon mode flag once identified via MHW_DemonModeDebugger
+        dbDemonMode = false
     else
         character      = nil
         weaponType     = -1
         isPorterRiding = false
+        dbDemonMode    = false
     end
 end)
 
@@ -126,6 +144,8 @@ if hitMethod then
             elseif weaponType == LBG then cd = cfg.lbgCooldown
             elseif weaponType == HBG then cd = cfg.hbgCooldown
             elseif weaponType == GS  then cd = cfg.gsCooldown
+            elseif weaponType == SNS then cd = cfg.snsCooldown
+            elseif weaponType == DB  then cd = cfg.dbCooldown
             end
             if now - lastHitAt < cd then return end
 
@@ -147,11 +167,19 @@ if hitMethod then
             elseif cfg.gsEnabled and weaponType == GS then
                 triggerGuard()
                 return sdk.PreHookResult.SKIP_ORIGINAL
+            elseif cfg.snsEnabled and weaponType == SNS then
+                if cfg.snsGuard then triggerGuard()
+                else triggerAction(1, 19) end
+                return sdk.PreHookResult.SKIP_ORIGINAL
             elseif cfg.evadeEnabled and weaponType == BOW then
                 triggerAction(2, 9)
                 return sdk.PreHookResult.SKIP_ORIGINAL
             elseif cfg.lbgEnabled and weaponType == LBG then
                 triggerAction(1, 19)
+                return sdk.PreHookResult.SKIP_ORIGINAL
+            elseif cfg.dbEnabled and weaponType == DB then
+                if dbDemonMode then triggerAction(2, 47)
+                else triggerAction(1, 19) end
                 return sdk.PreHookResult.SKIP_ORIGINAL
             end
         end,
@@ -166,7 +194,9 @@ end
 local showWindow = false
 
 local function weaponName()
-    if     weaponType == BOW then return 'Bow'
+    if     weaponType == SNS then return 'SnS'
+    elseif weaponType == DB  then return 'DB' .. (dbDemonMode and ' [Demon]' or '')
+    elseif weaponType == BOW then return 'Bow'
     elseif weaponType == HBG then return 'HBG'
     elseif weaponType == LBG then return 'LBG'
     elseif weaponType == GS  then return 'GS'
@@ -199,6 +229,8 @@ re.on_draw_ui(function()
         cfg.lbgCooldown = cfg.universalCooldown
         cfg.hbgCooldown = cfg.universalCooldown
         cfg.gsCooldown  = cfg.universalCooldown
+        cfg.snsCooldown = cfg.universalCooldown
+        cfg.dbCooldown  = cfg.universalCooldown
         changed = true
     end
     imgui.unindent(16)
@@ -248,6 +280,32 @@ re.on_draw_ui(function()
     c, cfg.gsEnabled = imgui.checkbox('Active##gs', cfg.gsEnabled)
     changed = changed or c
     c, cfg.gsCooldown = imgui.slider_float('Cooldown (s)##gs', cfg.gsCooldown, 0.05, 2.0)
+    changed = changed or c
+    imgui.unindent(16)
+
+    imgui.spacing()
+
+    -- SnS
+    imgui.text('Auto Guard / Dodge  (SnS)')
+    imgui.indent(16)
+    c, cfg.snsEnabled = imgui.checkbox('Active##sns', cfg.snsEnabled)
+    changed = changed or c
+    imgui.begin_disabled(not cfg.snsEnabled)
+    c, cfg.snsGuard = imgui.checkbox('Perfect Guard (unchecked = Dodge)##sns', cfg.snsGuard)
+    changed = changed or c
+    c, cfg.snsCooldown = imgui.slider_float('Cooldown (s)##sns', cfg.snsCooldown, 0.05, 2.0)
+    changed = changed or c
+    imgui.end_disabled()
+    imgui.unindent(16)
+
+    imgui.spacing()
+
+    -- DB
+    imgui.text('Auto Dodge / Perfect Dodge in Demon Mode  (Dual Blades)')
+    imgui.indent(16)
+    c, cfg.dbEnabled = imgui.checkbox('Active##db', cfg.dbEnabled)
+    changed = changed or c
+    c, cfg.dbCooldown = imgui.slider_float('Cooldown (s)##db', cfg.dbCooldown, 0.05, 2.0)
     changed = changed or c
     imgui.unindent(16)
 
