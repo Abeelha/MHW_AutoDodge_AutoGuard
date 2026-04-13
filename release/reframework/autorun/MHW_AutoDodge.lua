@@ -1,17 +1,20 @@
 -- MHW_AutoDodge.lua
--- Auto Perfect Dodge (Bow) and Auto Perfect Guard (HBG) for Monster Hunter Wilds.
+-- Auto Perfect Dodge (Bow, LBG) and Auto Perfect Guard (HBG) for Monster Hunter Wilds.
 --
--- Both weapons hook evHit_Damage PRE and return SKIP_ORIGINAL to cancel the hit.
+-- All weapons hook evHit_Damage PRE and return SKIP_ORIGINAL to cancel the hit.
 --
--- BOW:  queues Cat=2 Idx=9 (dodge start). The game's secondary evHit_DamagePreProcess
---       calls from the same attack upgrade the dodge to Cat=2 Idx=33 + SUB Cat=1 Idx=1
---       (perfect dodge with flash/slow effect) naturally.
+-- BOW:  queues Cat=2 Idx=9 (dodge start). Secondary evHit_DamagePreProcess calls
+--       from the same attack upgrade to Cat=2 Idx=33 + SUB Cat=1 Idx=1 naturally.
+--
+-- LBG:  queues Cat=1 Idx=19 (dodge start). Same secondary-hit upgrade pattern as Bow.
+--       Post-dodge state: Cat=2 Idx=60 + SUB Cat=1 Idx=9.
 --
 -- HBG:  calls startNoHitTimer + queues Cat=1 Idx=146 (perfect guard).
 
 local CONFIG_PATH = "MHW_AutoDodge.json"
 local BOW         = 11
 local HBG         = 12
+local LBG         = 13
 local COOLDOWN    = 0.3
 
 local ACTION_ID_TD = sdk.find_type_definition("ace.ACTION_ID")
@@ -25,6 +28,7 @@ local function defaultConfig()
     return {
         enabled      = true,
         evadeEnabled = true,
+        lbgEnabled   = true,
         guardEnabled = true,
         guardIframes = 0.25,
         bypassChecks = true,
@@ -117,8 +121,12 @@ if hitMethod then
                 triggerHBGGuard()
                 return sdk.PreHookResult.SKIP_ORIGINAL
             elseif cfg.evadeEnabled and weaponType == BOW then
-                -- Cat=2 Idx=9 (dodge start) → secondary PreProcess hits → Cat=2 Idx=33 + SUB 1,1
+                -- Cat=2 Idx=9 (dodge start) → secondary PreProcess → Cat=2 Idx=33 + SUB 1,1
                 triggerAction(2, 9)
+                return sdk.PreHookResult.SKIP_ORIGINAL
+            elseif cfg.lbgEnabled and weaponType == LBG then
+                -- Cat=1 Idx=19 (dodge start) → secondary PreProcess → Cat=2 Idx=60 + SUB 1,9
+                triggerAction(1, 19)
                 return sdk.PreHookResult.SKIP_ORIGINAL
             end
         end,
@@ -131,6 +139,13 @@ end
 
 -- UI
 local showWindow = false
+
+local function weaponName()
+    if weaponType == BOW then return 'Bow'
+    elseif weaponType == HBG then return 'HBG'
+    elseif weaponType == LBG then return 'LBG'
+    else return 'other' end
+end
 
 re.on_draw_ui(function()
     if imgui.button('Auto Evade / Guard') then
@@ -160,6 +175,14 @@ re.on_draw_ui(function()
 
     imgui.spacing()
 
+    imgui.text('Auto Dodge  (LBG)')
+    imgui.indent(16)
+    c, cfg.lbgEnabled = imgui.checkbox('Active##lbg', cfg.lbgEnabled)
+    changed = changed or c
+    imgui.unindent(16)
+
+    imgui.spacing()
+
     imgui.text('Auto Perfect Guard  (HBG)')
     imgui.indent(16)
     c, cfg.guardEnabled = imgui.checkbox('Active##guard', cfg.guardEnabled)
@@ -181,8 +204,7 @@ re.on_draw_ui(function()
 
     imgui.spacing()
     imgui.text_colored(
-        string.format('Weapon: %d  (%s)', weaponType,
-            weaponType == HBG and 'HBG' or weaponType == BOW and 'Bow' or 'other'),
+        string.format('Weapon: %d  (%s)', weaponType, weaponName()),
         0xFFAAAAAA)
 
     imgui.spacing()
