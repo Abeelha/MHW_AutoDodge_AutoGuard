@@ -19,7 +19,7 @@ When an enemy hits you, the mod intercepts the damage, blocks it, and triggers t
 
 1. Download the latest release.
 2. Copy the `reframework/` folder into your game directory (merge if asked).
-3. Launch the game — the mod loads automatically via REFramework autorun.
+3. Launch the game  the mod loads automatically via REFramework autorun.
 4. Configure in-game via the REFramework menu → **Auto Evade / Guard** button.
 
 ---
@@ -33,7 +33,7 @@ When an enemy hits you, the mod intercepts the damage, blocks it, and triggers t
 
 - Damage is blocked via `SKIP_ORIGINAL` on the `evHit_Damage` hook.
 - The animation is forced via `changeActionImmediate` on the `BaseActionController`.
-- **Weapon must be drawn** — sheathed hits are ignored (no godmode).
+- **Weapon must be drawn**  sheathed hits are ignored (no godmode).
 
 ---
 
@@ -56,8 +56,8 @@ Settings are saved to `MHW_AutoDodge.json`.
 
 | File | Purpose |
 |---|---|
-| `MHW_ActionLogger.lua` | Real-time action ID logger — copy to `reframework/autorun/` and perform moves to discover Cat/Idx values |
-| `MHW_MethodDumper.lua` | Dumps all methods of hunter character classes — use to find new API calls when adding weapon support |
+| `MHW_ActionLogger.lua` | Real-time action ID logger  copy to `reframework/autorun/` and perform moves to discover Cat/Idx values |
+| `MHW_MethodDumper.lua` | Dumps all methods of hunter character classes  use to find new API calls when adding weapon support |
 
 ---
 
@@ -73,6 +73,6 @@ Settings are saved to `MHW_AutoDodge.json`.
 
 ## Credits
 
-- [MHR_AutoDodge](https://github.com/Atomoxide/MHR_AutoDodge) by Atomoxide — original concept
+- [MHR_AutoDodge](https://github.com/Atomoxide/MHR_AutoDodge) by Atomoxide  original concept
 - [REFramework](https://www.nexusmods.com/monsterhunterwilds/mods/93) by praydog
 - MH Wilds port by Abeelha
