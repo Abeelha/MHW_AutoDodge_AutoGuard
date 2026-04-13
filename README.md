@@ -19,7 +19,7 @@ More weapons are being added over time based on requests from the [Nexus Mods co
 
 1. Download the latest release.
 2. Copy the `reframework/` folder into your game directory (merge if asked).
-3. Launch the game — the mod loads automatically via REFramework autorun.
+3. Launch the game  the mod loads automatically via REFramework autorun.
 4. Configure in-game via the REFramework menu → **Auto Evade / Guard** button.
 
 
@@ -41,6 +41,6 @@ Settings are saved to `MHW_AutoDodge.json` and editable in-game via the UI.
 
 ## Credits
 
-- [MHR_AutoDodge](https://github.com/Atomoxide/MHR_AutoDodge) by Atomoxide — original concept
+- [MHR_AutoDodge](https://github.com/Atomoxide/MHR_AutoDodge) by Atomoxide  original concept
 - [REFramework](https://www.nexusmods.com/monsterhunterwilds/mods/93) by praydog
 - MH Wilds port by Abeelha
