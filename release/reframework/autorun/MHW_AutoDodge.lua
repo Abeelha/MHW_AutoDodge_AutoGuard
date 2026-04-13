@@ -1,5 +1,5 @@
 -- MHW_AutoDodge.lua
--- Auto Perfect Dodge (Bow, LBG) and Auto Perfect Guard (HBG) for Monster Hunter Wilds.
+-- Auto Perfect Dodge (Bow, LBG) and Auto Perfect Guard (HBG, GS) for Monster Hunter Wilds.
 --
 -- All weapons hook evHit_Damage PRE and return SKIP_ORIGINAL to cancel the hit.
 --
@@ -7,15 +7,16 @@
 --       from the same attack upgrade to Cat=2 Idx=33 + SUB Cat=1 Idx=1 naturally.
 --
 -- LBG:  queues Cat=1 Idx=19 (dodge start). Same secondary-hit upgrade pattern as Bow.
---       Post-dodge state: Cat=2 Idx=60 + SUB Cat=1 Idx=9.
 --
--- HBG:  calls startNoHitTimer + queues Cat=1 Idx=146 (perfect guard).
+-- HBG:  startNoHitTimer + queues Cat=1 Idx=146 (perfect guard).
+--
+-- GS:   startNoHitTimer + queues Cat=1 Idx=146 (perfect guard, same action ID as HBG).
 
 local CONFIG_PATH = "MHW_AutoDodge.json"
+local GS          = 0
 local BOW         = 11
 local HBG         = 12
 local LBG         = 13
-local COOLDOWN    = 0.3
 
 local ACTION_ID_TD = sdk.find_type_definition("ace.ACTION_ID")
 local HUNTER_TD    = sdk.find_type_definition("app.HunterCharacter")
@@ -26,12 +27,24 @@ local lastHitAt  = 0
 
 local function defaultConfig()
     return {
-        enabled      = true,
-        evadeEnabled = true,
-        lbgEnabled   = true,
-        guardEnabled = true,
-        guardIframes = 0.25,
-        bypassChecks = true,
+        enabled           = true,
+        universalCooldown = 0.3,
+        -- Bow
+        evadeEnabled  = true,
+        bowCooldown   = 0.3,
+        -- LBG
+        lbgEnabled    = true,
+        lbgCooldown   = 0.3,
+        -- HBG
+        guardEnabled  = true,
+        guardIframes  = 0.25,
+        hbgCooldown   = 0.3,
+        -- GS
+        gsEnabled     = true,
+        gsIframes     = 0.25,
+        gsCooldown    = 0.3,
+        -- Misc
+        bypassChecks  = true,
     }
 end
 
@@ -72,8 +85,8 @@ local function triggerAction(cat, idx)
     if ok and ctrl then sendAction(ctrl, cat, idx) end
 end
 
-local function triggerHBGGuard()
-    pcall(function() character:call("startNoHitTimer(System.Single)", cfg.guardIframes) end)
+local function triggerGuard(iframes)
+    pcall(function() character:call("startNoHitTimer(System.Single)", iframes) end)
     triggerAction(1, 146)
 end
 
@@ -103,7 +116,13 @@ if hitMethod then
             if not cfg.enabled then return end
 
             local now = os.clock()
-            if now - lastHitAt < COOLDOWN then return end
+            local cd  = cfg.universalCooldown
+            if     weaponType == BOW then cd = cfg.bowCooldown
+            elseif weaponType == LBG then cd = cfg.lbgCooldown
+            elseif weaponType == HBG then cd = cfg.hbgCooldown
+            elseif weaponType == GS  then cd = cfg.gsCooldown
+            end
+            if now - lastHitAt < cd then return end
 
             if not cfg.bypassChecks then
                 if not character then return end
@@ -118,14 +137,15 @@ if hitMethod then
             lastHitAt = now
 
             if cfg.guardEnabled and weaponType == HBG then
-                triggerHBGGuard()
+                triggerGuard(cfg.guardIframes)
+                return sdk.PreHookResult.SKIP_ORIGINAL
+            elseif cfg.gsEnabled and weaponType == GS then
+                triggerGuard(cfg.gsIframes)
                 return sdk.PreHookResult.SKIP_ORIGINAL
             elseif cfg.evadeEnabled and weaponType == BOW then
-                -- Cat=2 Idx=9 (dodge start) → secondary PreProcess → Cat=2 Idx=33 + SUB 1,1
                 triggerAction(2, 9)
                 return sdk.PreHookResult.SKIP_ORIGINAL
             elseif cfg.lbgEnabled and weaponType == LBG then
-                -- Cat=1 Idx=19 (dodge start) → secondary PreProcess → Cat=2 Idx=60 + SUB 1,9
                 triggerAction(1, 19)
                 return sdk.PreHookResult.SKIP_ORIGINAL
             end
@@ -141,9 +161,10 @@ end
 local showWindow = false
 
 local function weaponName()
-    if weaponType == BOW then return 'Bow'
+    if     weaponType == BOW then return 'Bow'
     elseif weaponType == HBG then return 'HBG'
     elseif weaponType == LBG then return 'LBG'
+    elseif weaponType == GS  then return 'GS'
     else return 'other' end
 end
 
@@ -165,30 +186,71 @@ re.on_draw_ui(function()
     imgui.separator()
     imgui.spacing()
 
+    -- Universal cooldown — drives all weapon sliders simultaneously
+    imgui.text('Universal Cooldown')
+    imgui.indent(16)
+    c, cfg.universalCooldown = imgui.slider_float('All weapons##uni', cfg.universalCooldown, 0.05, 2.0)
+    if c then
+        cfg.bowCooldown = cfg.universalCooldown
+        cfg.lbgCooldown = cfg.universalCooldown
+        cfg.hbgCooldown = cfg.universalCooldown
+        cfg.gsCooldown  = cfg.universalCooldown
+        changed = true
+    end
+    imgui.unindent(16)
+
+    imgui.spacing()
+    imgui.separator()
+    imgui.spacing()
+
     imgui.begin_disabled(not cfg.enabled)
 
+    -- Bow
     imgui.text('Auto Perfect Dodge  (Bow)')
     imgui.indent(16)
     c, cfg.evadeEnabled = imgui.checkbox('Active##evade', cfg.evadeEnabled)
     changed = changed or c
-    imgui.unindent(16)
-
-    imgui.spacing()
-
-    imgui.text('Auto Dodge  (LBG)')
-    imgui.indent(16)
-    c, cfg.lbgEnabled = imgui.checkbox('Active##lbg', cfg.lbgEnabled)
+    c, cfg.bowCooldown = imgui.slider_float('Cooldown (s)##bow', cfg.bowCooldown, 0.05, 2.0)
     changed = changed or c
     imgui.unindent(16)
 
     imgui.spacing()
 
+    -- LBG
+    imgui.text('Auto Dodge  (LBG)')
+    imgui.indent(16)
+    c, cfg.lbgEnabled = imgui.checkbox('Active##lbg', cfg.lbgEnabled)
+    changed = changed or c
+    c, cfg.lbgCooldown = imgui.slider_float('Cooldown (s)##lbg', cfg.lbgCooldown, 0.05, 2.0)
+    changed = changed or c
+    imgui.unindent(16)
+
+    imgui.spacing()
+
+    -- HBG
     imgui.text('Auto Perfect Guard  (HBG)')
     imgui.indent(16)
     c, cfg.guardEnabled = imgui.checkbox('Active##guard', cfg.guardEnabled)
     changed = changed or c
     imgui.begin_disabled(not cfg.guardEnabled)
-    c, cfg.guardIframes = imgui.slider_float('IFrames (s)##guard', cfg.guardIframes, 0.1, 2.0)
+    c, cfg.guardIframes = imgui.slider_float('IFrames (s)##hbg', cfg.guardIframes, 0.1, 2.0)
+    changed = changed or c
+    c, cfg.hbgCooldown = imgui.slider_float('Cooldown (s)##hbg', cfg.hbgCooldown, 0.05, 2.0)
+    changed = changed or c
+    imgui.end_disabled()
+    imgui.unindent(16)
+
+    imgui.spacing()
+
+    -- GS
+    imgui.text('Auto Perfect Guard  (GS)')
+    imgui.indent(16)
+    c, cfg.gsEnabled = imgui.checkbox('Active##gs', cfg.gsEnabled)
+    changed = changed or c
+    imgui.begin_disabled(not cfg.gsEnabled)
+    c, cfg.gsIframes = imgui.slider_float('IFrames (s)##gs', cfg.gsIframes, 0.1, 2.0)
+    changed = changed or c
+    c, cfg.gsCooldown = imgui.slider_float('Cooldown (s)##gs', cfg.gsCooldown, 0.05, 2.0)
     changed = changed or c
     imgui.end_disabled()
     imgui.unindent(16)
