@@ -22,6 +22,16 @@ More weapons are being added over time based on requests from the [Nexus Mods co
 3. Launch the game  the mod loads automatically via REFramework autorun.
 4. Configure in-game via the REFramework menu → **Auto Evade / Guard** button.
 
+## Donation
+
+If this helped u, consider buying me a coffee :D
+
+```
+Bitcoin  (BTC)  bc1qk5jlu7hk05uvfpt33pgeaf78lzvnkgjyur8q04
+Ethereum (ETH)  0xd8834fc5330896405EC1A5db4bE997093E0408A7
+USDC     (ETH)  0xd8834fc5330896405EC1A5db4bE997093E0408A7
+```
+
 
 ## Config
 
