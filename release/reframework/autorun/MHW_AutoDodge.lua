@@ -14,8 +14,7 @@
 --
 -- SnS:  user-selectable — guard (Cat=1 Idx=146) or dodge (Cat=1 Idx=19).
 --
--- DB:   queues Cat=1 Idx=19 normally (regular dodge, no perfect dodge in normal stance),
---       or Cat=2 Idx=47 while in demon mode (→ secondary hits upgrade to Cat=2 Idx=48 perfect dodge).
+-- DB:   forces demon mode (Cat=2 Idx=53) then queues Cat=2 Idx=47 (demon dodge → Cat=2 Idx=48 perfect).
 --
 -- Mount detection: get_IsPorterRiding == true → skip hook entirely.
 
@@ -33,7 +32,6 @@ local HUNTER_TD    = sdk.find_type_definition("app.HunterCharacter")
 local character      = nil
 local weaponType     = -1
 local isPorterRiding = false
-local dbDemonMode    = false
 local lastHitAt      = 0
 
 local function defaultConfig()
@@ -120,8 +118,6 @@ re.on_pre_application_entry('BeginRendering', function()
         weaponType = wok and wt or -1
         local rok, rv = pcall(function() return char:call("get_IsPorterRiding") end)
         isPorterRiding = rok and rv == true
-        -- TODO: replace with real demon mode flag once identified via MHW_DemonModeDebugger
-        dbDemonMode = false
     else
         character      = nil
         weaponType     = -1
@@ -178,8 +174,8 @@ if hitMethod then
                 triggerAction(1, 19)
                 return sdk.PreHookResult.SKIP_ORIGINAL
             elseif cfg.dbEnabled and weaponType == DB then
-                if dbDemonMode then triggerAction(2, 47)
-                else triggerAction(1, 19) end
+                triggerAction(2, 53)  -- force demon mode enable
+                triggerAction(2, 47)  -- demon dodge → secondary hits upgrade to perfect (Cat=2 Idx=48)
                 return sdk.PreHookResult.SKIP_ORIGINAL
             end
         end,
@@ -195,7 +191,7 @@ local showWindow = false
 
 local function weaponName()
     if     weaponType == SNS then return 'SnS'
-    elseif weaponType == DB  then return 'DB' .. (dbDemonMode and ' [Demon]' or '')
+    elseif weaponType == DB  then return 'DB'
     elseif weaponType == BOW then return 'Bow'
     elseif weaponType == HBG then return 'HBG'
     elseif weaponType == LBG then return 'LBG'
