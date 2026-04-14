@@ -14,6 +14,8 @@
 --
 -- SnS:  user-selectable — guard (Cat=1 Idx=146) or dodge (Cat=1 Idx=19).
 --
+-- CB:   user-selectable — guard (Cat=1 Idx=146) or dodge (Cat=1 Idx=19).
+--
 -- DB:   forces demon mode (Cat=2 Idx=53) then queues Cat=2 Idx=47 (demon dodge → Cat=2 Idx=48 perfect).
 --
 -- Mount detection: get_IsPorterRiding == true → skip hook entirely.
@@ -22,6 +24,7 @@ local CONFIG_PATH = "MHW_AutoDodge.json"
 local SNS = 1
 local DB  = 2
 local GS  = 0
+local CB  = 9
 local BOW = 11
 local HBG = 12
 local LBG = 13
@@ -58,6 +61,10 @@ local function defaultConfig()
         -- DB
         dbEnabled     = true,
         dbCooldown    = 0.3,
+        -- CB
+        cbEnabled     = true,
+        cbGuard       = true,   -- true = perfect guard, false = dodge
+        cbCooldown    = 0.3,
         -- Misc
         requireWeaponOn = true,
         bypassChecks    = false,
@@ -147,6 +154,7 @@ if hitMethod then
             elseif weaponType == GS  then cd = cfg.gsCooldown
             elseif weaponType == SNS then cd = cfg.snsCooldown
             elseif weaponType == DB  then cd = cfg.dbCooldown
+            elseif weaponType == CB  then cd = cfg.cbCooldown
             end
             if now - lastHitAt < cd then return end
 
@@ -178,6 +186,10 @@ if hitMethod then
             elseif cfg.lbgEnabled and weaponType == LBG then
                 triggerAction(1, 19)
                 return sdk.PreHookResult.SKIP_ORIGINAL
+            elseif cfg.cbEnabled and weaponType == CB then
+                if cfg.cbGuard then triggerGuard()
+                else triggerAction(1, 19) end
+                return sdk.PreHookResult.SKIP_ORIGINAL
             elseif cfg.dbEnabled and weaponType == DB then
                 triggerAction(2, 53)  -- force demon mode enable
                 triggerAction(2, 47)  -- demon dodge → secondary hits upgrade to perfect (Cat=2 Idx=48)
@@ -196,6 +208,7 @@ local showWindow = false
 
 local function weaponName()
     if     weaponType == SNS then return 'SnS'
+    elseif weaponType == CB  then return 'CB'
     elseif weaponType == DB  then return 'DB'
     elseif weaponType == BOW then return 'Bow'
     elseif weaponType == HBG then return 'HBG'
@@ -232,6 +245,7 @@ re.on_draw_ui(function()
         cfg.gsCooldown  = cfg.universalCooldown
         cfg.snsCooldown = cfg.universalCooldown
         cfg.dbCooldown  = cfg.universalCooldown
+        cfg.cbCooldown  = cfg.universalCooldown
         changed = true
     end
     imgui.unindent(16)
@@ -308,6 +322,21 @@ re.on_draw_ui(function()
     changed = changed or c
     c, cfg.dbCooldown = imgui.slider_float('Cooldown (s)##db', cfg.dbCooldown, 0.05, 2.0)
     changed = changed or c
+    imgui.unindent(16)
+
+    imgui.spacing()
+
+    -- CB
+    imgui.text('Auto Guard / Dodge  (Charge Blade)')
+    imgui.indent(16)
+    c, cfg.cbEnabled = imgui.checkbox('Active##cb', cfg.cbEnabled)
+    changed = changed or c
+    imgui.begin_disabled(not cfg.cbEnabled)
+    c, cfg.cbGuard = imgui.checkbox('Perfect Guard (unchecked = Dodge)##cb', cfg.cbGuard)
+    changed = changed or c
+    c, cfg.cbCooldown = imgui.slider_float('Cooldown (s)##cb', cfg.cbCooldown, 0.05, 2.0)
+    changed = changed or c
+    imgui.end_disabled()
     imgui.unindent(16)
 
     imgui.end_disabled()
