@@ -32,6 +32,7 @@ local HUNTER_TD    = sdk.find_type_definition("app.HunterCharacter")
 local character      = nil
 local weaponType     = -1
 local isPorterRiding = false
+local isWeaponOn     = false
 local lastHitAt      = 0
 
 local function defaultConfig()
@@ -58,7 +59,8 @@ local function defaultConfig()
         dbEnabled     = true,
         dbCooldown    = 0.3,
         -- Misc
-        bypassChecks  = true,
+        requireWeaponOn = true,
+        bypassChecks    = false,
     }
 end
 
@@ -118,11 +120,13 @@ re.on_pre_application_entry('BeginRendering', function()
         weaponType = wok and wt or -1
         local rok, rv = pcall(function() return char:call("get_IsPorterRiding") end)
         isPorterRiding = rok and rv == true
+        local wok, wv = pcall(function() return char:call("get_IsWeaponOn") end)
+        isWeaponOn = wok and wv == true
     else
         character      = nil
         weaponType     = -1
         isPorterRiding = false
-        dbDemonMode    = false
+        isWeaponOn     = false
     end
 end)
 
@@ -133,6 +137,7 @@ if hitMethod then
         function(args)
             if not cfg.enabled then return end
             if isPorterRiding then return end
+            if cfg.requireWeaponOn and not isWeaponOn then return end
 
             local now = os.clock()
             local cd  = cfg.universalCooldown
@@ -311,7 +316,9 @@ re.on_draw_ui(function()
     imgui.separator()
     imgui.spacing()
 
-    c, cfg.bypassChecks = imgui.checkbox('Bypass mine/enemy checks', cfg.bypassChecks)
+    c, cfg.requireWeaponOn = imgui.checkbox('Only trigger with weapon drawn (uncheck = works sheathed too)', cfg.requireWeaponOn)
+    changed = changed or c
+    c, cfg.bypassChecks = imgui.checkbox('Bypass owner check (enable if mod stops triggering)', cfg.bypassChecks)
     changed = changed or c
 
     imgui.spacing()
